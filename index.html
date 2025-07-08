@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TimeTag Extension</title>
+    <style>
+      body {
+        width: 400px;
+        padding: 16px;
+        font-family: Arial, sans-serif;
+      }
+      button {
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin: 4px;
+      }
+      button:hover {
+        background: #0056b3;
+      }
+      #output {
+        margin-top: 16px;
+        max-height: 300px;
+        overflow-y: auto;
+        border: 1px solid #ccc;
+        padding: 8px;
+        background: #f9f9f9;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <h3>TimeTag Extension</h3>
+    <p>Test webpage content access:</p>
+    <button id="getContent">Get Page Content</button>
+    <button id="findPrices">Find Price Elements</button>
+    <div id="output"></div>
+    <script src="index.js"></script>
+  </body>
+</html>
