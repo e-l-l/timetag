@@ -1,8 +1,11 @@
 // Content script that runs on web pages
 console.log("TimeTag extension content script loaded");
 
-// Conversion rate: rupees to hours
-const RUPEES_PER_HOUR = 942.77;
+// Conversion rate: rupees to hours (will be loaded from storage)
+let RUPEES_PER_HOUR = 1; // Default fallback
+
+// Load configuration from storage
+loadConfiguration();
 
 // Function to extract numeric content from price elements
 function extractPriceFromElement(element) {
@@ -102,8 +105,15 @@ function findAndExtractPrices() {
   });
 }
 
-// Run the price extraction when the page loads
-findAndExtractPrices();
+// Run the price extraction after configuration is loaded
+async function initializeExtension() {
+  await loadConfiguration();
+  console.log(`TimeTag: Using rate ₹${RUPEES_PER_HOUR} per hour`);
+  findAndExtractPrices();
+}
+
+// Initialize the extension
+initializeExtension();
 
 // Also run when the DOM changes (for dynamic content)
 const observer = new MutationObserver((mutations) => {
@@ -141,7 +151,32 @@ observer.observe(document.body, {
   subtree: true,
 });
 
-// Listen for messages from the popup (keeping for compatibility)
+// Load configuration from Chrome storage
+async function loadConfiguration() {
+  try {
+    console.log("TimeTag: Loading configuration from storage...");
+    const result = await chrome.storage.sync.get("timetagConfig");
+    console.log("TimeTag: Storage result:", result);
+
+    const config = result.timetagConfig;
+    console.log("TimeTag: Config object:", config);
+
+    if (config && config.hourlyRate) {
+      RUPEES_PER_HOUR = config.hourlyRate;
+      console.log(
+        `TimeTag: Loaded configuration - ₹${RUPEES_PER_HOUR} per hour`
+      );
+    } else {
+      console.log(
+        "TimeTag: No configuration found, using default rate ₹942.77"
+      );
+    }
+  } catch (error) {
+    console.error("TimeTag: Error loading configuration:", error);
+  }
+}
+
+// Listen for messages from the popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "getPageContent") {
     // Return current page content if needed
@@ -153,6 +188,25 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           price: extractPriceFromElement(el),
         })
       ),
+    });
+  } else if (request.action === "updateRate") {
+    // Update the conversion rate
+    RUPEES_PER_HOUR = request.hourlyRate;
+    console.log(`TimeTag: Updated rate to ₹${RUPEES_PER_HOUR} per hour`);
+
+    // Re-process existing price elements with new rate
+    const existingDisplays = document.querySelectorAll(
+      ".timetag-hours-display"
+    );
+    existingDisplays.forEach((display) => {
+      const priceElement = display.previousElementSibling;
+      if (priceElement && priceElement.classList.contains("a-price-whole")) {
+        const price = extractPriceFromElement(priceElement);
+        if (price !== null) {
+          const hours = price / RUPEES_PER_HOUR;
+          display.textContent = `${hours.toFixed(2)} hours`;
+        }
+      }
     });
   }
 });
