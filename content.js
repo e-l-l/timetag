@@ -37,38 +37,67 @@ function extractPriceFromElement(element) {
   return isNaN(price) ? null : price;
 }
 
+// Function to inject hours display into the HTML
+function injectHoursDisplay(priceElement, hours) {
+  // Check if we already added a time display to this element
+  const existingTimeDisplay = priceElement.parentElement.querySelector(
+    ".timetag-hours-display"
+  );
+  if (existingTimeDisplay) {
+    // Update existing display
+    existingTimeDisplay.textContent = `${hours.toFixed(2)} hours`;
+    return;
+  }
+
+  // Create the hours display element
+  const timeDisplay = document.createElement("div");
+  timeDisplay.className = "timetag-hours-display";
+  timeDisplay.textContent = `${hours.toFixed(2)} hours`;
+  timeDisplay.style.cssText = `
+    color:rgb(103, 48, 255);
+    font-size: 0.75em;
+    margin-top: 2px;
+    font-style: italic;
+  `;
+
+  // Insert the display after the price element
+  // Try to insert after the price element itself, or after its parent if needed
+  const insertAfter = priceElement.nextSibling || priceElement.parentElement;
+  if (insertAfter) {
+    insertAfter.parentNode.insertBefore(timeDisplay, insertAfter.nextSibling);
+  } else {
+    // Fallback: append to the price element's parent
+    priceElement.parentElement.appendChild(timeDisplay);
+  }
+
+  // Mark this price element as processed to prevent infinite loops
+  priceElement.setAttribute("data-timetag-processed", "true");
+}
+
 // Function to find and extract prices from a-price-whole elements
 function findAndExtractPrices() {
   const priceElements = document.querySelectorAll(".a-price-whole");
 
   if (priceElements.length === 0) {
-    console.log(
-      'TimeTag: No elements with class "a-price-whole" found on this page'
-    );
     return;
   }
 
-  console.log(`TimeTag: Found ${priceElements.length} price element(s)`);
-
   priceElements.forEach((element, index) => {
+    // Skip if already processed
+    if (element.hasAttribute("data-timetag-processed")) {
+      return;
+    }
+
     const price = extractPriceFromElement(element);
     const originalText = element.textContent || element.innerText || "";
 
     if (price !== null) {
       const hours = price / RUPEES_PER_HOUR;
-      console.log(
-        `TimeTag: Price ${
-          index + 1
-        } - Original: "${originalText.trim()}" → ₹${price} → ${hours.toFixed(
-          2
-        )} hours`
-      );
+
+      // Inject the hours display into the HTML
+      injectHoursDisplay(element, hours);
     } else {
-      console.log(
-        `TimeTag: Price ${
-          index + 1
-        } - Could not extract numeric value from: "${originalText.trim()}"`
-      );
+      console.log("Could not extract numeric value from: ", originalText);
     }
   });
 }
@@ -81,7 +110,23 @@ const observer = new MutationObserver((mutations) => {
   // Check if any new nodes were added that might contain price elements
   const hasNewContent = mutations.some(
     (mutation) =>
-      mutation.type === "childList" && mutation.addedNodes.length > 0
+      mutation.type === "childList" &&
+      mutation.addedNodes.length > 0 &&
+      // Only trigger if the added nodes contain price elements or are not our own injected elements
+      Array.from(mutation.addedNodes).some((node) => {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          // Skip if it's our own injected element
+          if (
+            node.classList &&
+            node.classList.contains("timetag-hours-display")
+          ) {
+            return false;
+          }
+          // Check if it contains price elements
+          return node.querySelector && node.querySelector(".a-price-whole");
+        }
+        return false;
+      })
   );
 
   if (hasNewContent) {
